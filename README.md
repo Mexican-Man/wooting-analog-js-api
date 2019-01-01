@@ -37,6 +37,8 @@ Returns the analog value (0-255) of the key at (column, row).
 #### `this.wooting_read_full_buffer()`
 Returns a buffer (array) of up to 16 keys (32 bytes/ints). Example: [0,147,3,255] would be Escape pressed 58%, and "3" pressed 100%.
 
+> **Note:** Alternatively, you can just read `this.buffer` to get *ALL* key values, regardless of value.
+
 
 #### `this.wooting_refresh_buffer()`
 Manually refreshes key buffer. Stores updated buffer in `this.buffer` and moves current buffer to `this.oldBuffer`. Returns whether or not the buffer was refreshed successfully.
@@ -49,3 +51,34 @@ Creates a prompt for the user to select their Wooting Keyboard, then sets up the
 
 > **Note:** This function *MUST* be triggered but a user action. If it is not, it will fail.
 
+A listener event for:
+#### `analogkeypress`
+is available. It fires whenever any analog value changes, and contains no properties.
+
+## Examples
+Here is a short example of what your setup could look like:
+```HTML
+<body>
+  <button onClick="">Click Here!</button>
+  <script>
+    // Create a new keyboard instance that polls every 20ms
+    var keyboard = new WootingKeyboard(50);
+    async function color() {
+    
+      // Prompt user to select a keyboard
+      await keyboard.wooting_kbd_connected().then(function(){
+    
+        // If successful, turn the background green
+        document.getElementsByTagName("body")[0].style.backgroundColor = "green";
+        // And, whenever a value changes, log the keys being pressed (in buffer form) into the console
+        keyboard.addEventListener("analogkeypress", () => {console.log(keyboard.wooting_read_full_buffer())})
+    
+      }).catch(function(){
+    
+        // Else, turn the background red
+        document.getElementsByTagName("body")[0].style.backgroundColor = "red";
+      });
+    }
+  </script>
+</body>
+```
