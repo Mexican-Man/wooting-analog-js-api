@@ -9,6 +9,8 @@ Returns whether or not the current browser supports WebUSB.
 
 
 #### `new WootingKeyboard([pollingRate])`
+- `pollingRate` - How often the listener should be updated, in Hz
+
 Creates a new keyboard object. Multiple keyboard instances can be created and can be addressed individually. Use member functions to interact with the device.
 
 
