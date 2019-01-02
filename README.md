@@ -1,4 +1,5 @@
 # Wooting JS API
+IMPORTANT: I don't have a Wooting keyboard yet, so this probably doesn't work entirely.
 This .js file will let you read analog input **directly** from your Wooting keyboard into your own Javascript code. This API is based loosely off of the original [Wooting Analog SDK](https://github.com/WootingKb/wooting-analog-sdk) with some minor changes and additions.
 
 > **Note:** This API makes use of the WebUSB feature. [Only certain browsers are supported.](https://caniuse.com/#feat=webusb)
