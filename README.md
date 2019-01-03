@@ -5,6 +5,8 @@ This .js file will let you read analog input **directly** from your Wooting keyb
 
 > **Note:** This API makes use of the WebUSB feature. [Only certain browsers are supported.](https://caniuse.com/#feat=webusb)
 
+> **Another Note:** According to Google, this should only be useable on HTTPS. It seems to work fine on `file:\\\` as well.
+
 ## Usage
 #### `checkIfBrowserSupported()`
 Returns whether or not the current browser supports WebUSB.
