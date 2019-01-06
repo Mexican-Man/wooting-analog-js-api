@@ -9,15 +9,14 @@ const scan_index_array = [
 	[64, 87, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 255, 75, 255, 63, 255, 90, 91, 92, 93],
 	[80, 81, 82, 255, 255, 255, 83, 255, 255, 255, 84, 85, 86, 79, 76, 77, 78, 255, 95, 94, 255]
 ]; // Key number for every single key
-var event = new CustomEvent("analogkeypress");
 class WootingKeyboard {
 	constructor(pollingRate = 50) {
-		this.device; 			// Keyboard "device"
-		this.dcCallback; 		// Custom callback for when disconnected
-		this.buffer = []; 		// Buffer for keys being pressed
-		this.oldBuffer = [];	// Buffer for keys pressed last poll
-		this.PRODUCT_ID; 		// Product ID for the device
-		this.deviceName; 		// Name of the keyboard
+		this.device; // Keyboard "device"
+		this.dcCallback; // Custom callback for when disconnected
+		this.buffer = []; // Buffer for keys being pressed
+		this.oldBuffer = []; // Buffer for keys pressed last poll
+		this.PRODUCT_ID; // Product ID for the device
+		this.deviceName; // Name of the keyboard
 		this.pollingRate = pollingRate;
 		this.poller;
 		this.listeners = [];
@@ -26,12 +25,12 @@ class WootingKeyboard {
 	/*	------------------
 		Internal functions
 		------------------	*/
-	
+
 	// Add a listener
 	addAnalogListener(func) {
 		this.listeners.push(func);
 	}
-	
+
 	// Polling for listeners
 	wooting_keyboard_poll() {
 		// If buffer has changed, then iterate through each listener
@@ -41,72 +40,100 @@ class WootingKeyboard {
 			}
 		}
 		// Assign action to cancellable variable
-		this.poller = setTimeout(this.wooting_keyboard_poll, 1000/parseInt(this.pollingRate));
+		this.poller = setTimeout(
+			this.wooting_keyboard_poll,
+			1000 / parseInt(this.pollingRate)
+		);
 	}
-	
+
 	// Prompts the user to select a Wooting, then attempts to open connection. Returns whether or not successful
 	async wooting_keyboard_connect(selectedDevice = undefined) {
-		
 		// Let user select desired keyboard
-		var selectedDevice = await navigator.usb.requestDevice({
-			filters: [/*{
-				vendorId: VENDOR_ID
-			}*/]
-		}).then(async (selectedDevice) => {	// If this is found
-			this.device = selectedDevice;					// Assign device object
-			this.PRODUCT_ID = selectedDevice.productId; 	// Assign product ID
-			this.deviceName = selectedDevice.productName;	// Assign device name
-			await this.device.open();						// Open connection to device object
-			
-			// Misc configurations
-			await this.device.selectConfiguration(1);
-			await this.device.claimInterface(1);
-			
-			// Set disconnect listener for dcCallback
-			navigator.usb.addEventListener('disconnect', () => {
-				this.device.wooting_this_disconnect();
+		var selectedDevice = await navigator.usb
+			.requestDevice({
+				filters: [
+					{
+						vendorId: VENDOR_ID
+					}
+				]
+			})
+			.then(async selectedDevice => {
+				// If this is found
+				this.device = selectedDevice; // Assign device object
+				this.PRODUCT_ID = selectedDevice.productId; // Assign product ID
+				this.deviceName = selectedDevice.productName; // Assign device name
+				await this.device.open(); // Open connection to device object
+
+				// Misc configurations
+				await this.device.selectConfiguration(1);
+				await this.device.claimInterface(1);
+
+				// Set disconnect listener for dcCallback
+				navigator.usb.addEventListener("disconnect", () => {
+					this.device.wooting_this_disconnect();
+				});
+
+				this.poller = setTimeout(
+					this.wooting_this_poll,
+					1000 / parseInt(this.pollingRate)
+				); // Set poller for listeners
+
+				return true;
+			})
+			.catch(() => {
+				if (keyboard.device == undefined) {
+					throw "Unable to find keyboard!";
+				} else {
+					throw "Unable to open connection to keyboard!";
+				}
 			});
-			
-			this.poller = setTimeout(this.wooting_this_poll, 1000/parseInt(this.pollingRate)); // Set poller for listeners
-			
-			return true;
-		}).catch(() => {
-			if (keyboard.device == undefined) {
-				throw "Unable to find keyboard!";
-			} else {
-				throw "Unable to open connection to keyboard!"
-			}
-		});
 	}
 
 	// Callback for receiving HID data, returns raw data from keyboard
 	async wooting_keyboard_receive() {
-		await this.device.controlTransferIn({requestType: "standard", recipient:"device", request: 0x01, value: 0b11111111111, index: 0x0001}, 32).then(result => {
-			return result;
-		}).catch(result => {
-			throw "error";
-		});
+		await this.device
+			.controlTransferIn(
+				{
+					requestType: "standard",
+					recipient: "device",
+					request: 0x01,
+					value: 0b11111111111,
+					index: 0x0001
+				},
+				32
+			)
+			.then(result => {
+				return result;
+			})
+			.catch(result => {
+				throw "error";
+			});
 	}
-	
+
 	// Reconnected to a paired and available Wooting keyboard without prompting the user. Returns rejected or resolved promise based on whether or not successful
 	async wooting_keyboard_reconnect() {
-		await navigator.usb.getDevices({
-			filters: [/*{
-				vendorId: VENDOR_ID
-			}*/]
-		}).then(async prevConnected => {
-			// Check if previously connected device is available
-			if (prevConnected[0] == undefined) {
-				throw "error";
-			}
-			
-			// Connect to this device
-			await this.wooting_keyboard_connect(prevConnected[0]);
-			
-			return true;
-		}).catch(() => {
-			throw "No paired keyboards available!";
-		});
+		await navigator.usb
+			.getDevices({
+				filters: [
+					{
+						vendorId: VENDOR_ID
+					}
+				]
+			})
+			.then(async prevConnected => {
+				// Check if previously connected device is available
+				if (prevConnected[0] == undefined) {
+					throw "error";
+				}
+
+				// Connect to this device
+				await this.wooting_keyboard_connect(prevConnected[0]);
+
+				return true;
+			})
+			.catch(() => {
+				throw "No paired keyboards available!";
+			});
 	}
 
 	/*	----------------------------
@@ -145,7 +172,7 @@ class WootingKeyboard {
 
 	// Return whether or not keyboard is connected
 	wooting_kbd_connected() {
-		return (this.device != undefined);
+		return this.device != undefined;
 	}
 
 	// Set callbacks for different tabs, returns nothing
@@ -155,13 +182,12 @@ class WootingKeyboard {
 
 	// Read and return value of specific key
 	wooting_read_analog(row, column) {
-
 		// Update buffer
 		if (!this.wooting_refresh_buffer()) {
 			return 0;
 		}
 		// Check if coordinates are valid
-		if (row > (WOOTING_RGB_ROWS - 1) || column > (WOOTING_RGB_COLS - 1)) {
+		if (row > WOOTING_RGB_ROWS - 1 || column > WOOTING_RGB_COLS - 1) {
 			return 0;
 		}
 
@@ -182,7 +208,6 @@ class WootingKeyboard {
 
 	// Read and return buffer of 16 keys pressed
 	wooting_read_full_buffer() {
-
 		// Update buffer
 		if (!this.wooting_refresh_buffer()) {
 			return 0;
@@ -209,7 +234,6 @@ class WootingKeyboard {
 		}
 		return data;
 	}
-
 }
 
 // Check if browser is supported, returns true or false
