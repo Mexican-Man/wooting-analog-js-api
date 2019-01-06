@@ -9,7 +9,7 @@ const scan_index_array = [
 	[64, 87, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 255, 75, 255, 63, 255, 90, 91, 92, 93],
 	[80, 81, 82, 255, 255, 255, 83, 255, 255, 255, 84, 85, 86, 79, 76, 77, 78, 255, 95, 94, 255]
 ]; // Key number for every single key
-var event = new CustomEvent("analogkeypress")
+var event = new CustomEvent("analogkeypress");
 class WootingKeyboard {
 	constructor(pollingRate = 50) {
 		this.device; 			// Keyboard "device"
@@ -20,69 +20,92 @@ class WootingKeyboard {
 		this.deviceName; 		// Name of the keyboard
 		this.pollingRate = pollingRate;
 		this.poller;
+		this.listeners = [];
 	}
 
 	/*	------------------
 		Internal functions
 		------------------	*/
 	
+	// Add a listener
+	addAnalogListener(func) {
+		this.listeners.push(func);
+	}
+	
 	// Polling for listeners
 	wooting_keyboard_poll() {
-		if (oldBuffer !== buffer) {
-			this.dispatchEvent(event);
+		// If buffer has changed, then iterate through each listener
+		if (this.oldBuffer !== this.buffer) {
+			for (var i = 0; i < this.listeners.length; i++) {
+				this.listeners[i];
+			}
 		}
-		// Assign to cancellable variable
-		this.poller = setTimeout(wooting_keyboard_poll, 1000/parseInt(this.pollingRate));
+		// Assign action to cancellable variable
+		this.poller = setTimeout(this.wooting_keyboard_poll, 1000/parseInt(this.pollingRate));
 	}
 	
 	// Prompts the user to select a Wooting, then attempts to open connection. Returns whether or not successful
-	async wooting_keyboard_connect() {
-
+	async wooting_keyboard_connect(selectedDevice = undefined) {
+		
 		// Let user select desired keyboard
-		await navigator.usb.requestDevice({
-				filters: [{
-					vendorId: VENDOR_ID
-				}]
-			}).then(selectedDevice => {
-				// If keyboard is found
-				this.PRODUCT_ID = selectedDevice.productId;
-
-				// Assign device name
-				switch (this.PRODUCT_ID) {
-				case 65281:
-					this.deviceName = "Wooting One";
-					break;
-				case 65282:
-					this.deviceName = "Wooting Two";
-					break;
-				}
-
-				this.device = selectedDevice; // Assign device object
-				this.device.open(); // Open connection to device object
-
-				// Set disconnect listener for dcCallback
-				navigator.usb.addEventListener('disconnect', () => {
-					this.device.wooting_keyboard_disconnect();
-				});
-			})
-			.then(() => this.device.selectConfiguration(1))
-			.then(() => this.device.claimInterface(2))
-			.then(function () {
-				// Return successful
-				this.poller = setTimeout(wooting_keyboard_poll, 1000/parseInt(this.pollingRate));
-				resolve(true);
-			})
-			.catch(function () {
-				// If keyboard is not found, return false
-				this.device = undefined;
-				resolve(false);
+		var selectedDevice = await navigator.usb.requestDevice({
+			filters: [/*{
+				vendorId: VENDOR_ID
+			}*/]
+		}).then(async (selectedDevice) => {	// If this is found
+			this.device = selectedDevice;					// Assign device object
+			this.PRODUCT_ID = selectedDevice.productId; 	// Assign product ID
+			this.deviceName = selectedDevice.productName;	// Assign device name
+			await this.device.open();						// Open connection to device object
+			
+			// Misc configurations
+			await this.device.selectConfiguration(1);
+			await this.device.claimInterface(1);
+			
+			// Set disconnect listener for dcCallback
+			navigator.usb.addEventListener('disconnect', () => {
+				this.device.wooting_this_disconnect();
 			});
+			
+			this.poller = setTimeout(this.wooting_this_poll, 1000/parseInt(this.pollingRate)); // Set poller for listeners
+			
+			return true;
+		}).catch(() => {
+			if (keyboard.device == undefined) {
+				throw "Unable to find keyboard!";
+			} else {
+				throw "Unable to open connection to keyboard!"
+			}
+		});
 	}
 
 	// Callback for receiving HID data, returns raw data from keyboard
 	async wooting_keyboard_receive() {
-		await this.device.controlTransferIn(0, 32).then(result => {
+		await this.device.controlTransferIn({requestType: "standard", recipient:"device", request: 0x01, value: 0b11111111111, index: 0x0001}, 32).then(result => {
 			return result;
+		}).catch(result => {
+			throw "error";
+		});
+	}
+	
+	// Reconnected to a paired and available Wooting keyboard without prompting the user. Returns rejected or resolved promise based on whether or not successful
+	async wooting_keyboard_reconnect() {
+		await navigator.usb.getDevices({
+			filters: [/*{
+				vendorId: VENDOR_ID
+			}*/]
+		}).then(async prevConnected => {
+			// Check if previously connected device is available
+			if (prevConnected[0] == undefined) {
+				throw "error";
+			}
+			
+			// Connect to this device
+			await this.wooting_keyboard_connect(prevConnected[0]);
+			
+			return true;
+		}).catch(() => {
+			throw "No paired keyboards available!";
 		});
 	}
 
@@ -111,6 +134,7 @@ class WootingKeyboard {
 			return false;
 		}
 		try {
+			// Shifts 'buffer' to 'oldBuffer'
 			this.oldBuffer = this.buffer.slice();
 			this.buffer = this.wooting_keyboard_receive();
 			return true;
@@ -119,20 +143,9 @@ class WootingKeyboard {
 		}
 	}
 
-	// Return whether or not keyboard is detected
-	wooting_kbd_connected(selectNewKeyboard = false) {
-		return new Promise(resolve => {
-			// Force to request new keyboardif it hasn't been set yet
-			if (this.device === undefined || this.selectNewKeyboard) {
-				this.wooting_keyboard_disconnect();
-				resolve(this.wooting_keyboard_connect());
-			} else if (this.wooting_refresh_buffer()) {
-				resolve(true);
-			} else {
-				resolve(false);
-			}
-		});
-
+	// Return whether or not keyboard is connected
+	wooting_kbd_connected() {
+		return (this.device != undefined);
 	}
 
 	// Set callbacks for different tabs, returns nothing
@@ -156,7 +169,7 @@ class WootingKeyboard {
 		var scan_index = scan_index_array[row][column];
 		for (var i = 0; i < this.buffer.length(); i += 2) {
 			if (this.buffer[i - 1] == scan_index) {
-				// Cap out values to a maximum
+				// Round out values to a maximum
 				if (this.buffer[i] > 225) {
 					return 255;
 				} else {
@@ -185,7 +198,7 @@ class WootingKeyboard {
 			if (analog_value > 0) {
 				data.push(scan_code); // Send key first
 
-				// Cap out values to a maximum
+				// Round out values to a maximum
 				if (analog_value > 225) {
 					analog_value = 255;
 				}
