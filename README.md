@@ -72,42 +72,25 @@ Here is a short example of what your setup could look like:
 	async function color() {
 
 		// Prompt user to select a keyboard
-		var result = await keyboard.wooting_keyboard_connect().then(() => {
-			document.getElementsByTagName("button")[0].classList = "btn btn-lg btn-block btn-success"; // If successful, turn button green
-
-			// Set device properties
-			document.getElementById("deviceName").innerHTML = keyboard.deviceName;
-			document.getElementById("productId").innerHTML = keyboard.PRODUCT_ID;
-			document.getElementById("pollingRate").innerHTML = keyboard.pollingRate;
+		await keyboard.wooting_keyboard_connect().then(() => {
+	  		// If successful, turn button green
+			document.getElementsByTagName("button")[0].classList = "btn btn-lg btn-block btn-success"; 
 
 			// And, whenever a value changes, log the keys being pressed (in buffer form) into the console
 			keyboard.addAnalogListener(() => {
-				read();
+	  			// Log entire buffer to console
 				console.log(keyboard.wooting_read_full_buffer());
 				keyboard.wooting_set_disconnected_cb(() =>{
+	  				// Reset button color on disconnect
 					document.getElementsByTagName("button")[0].classList = "btn btn-lg btn-block btn-danger";
-					document.getElementById("deviceName").innerHTML = "";
-					document.getElementById("productId").innerHTML = "";
-					document.getElementById("pollingRate").innerHTML = "";
 				})
 			});
 			return true;
 		}).catch(() => {
-			document.getElementsByTagName("button")[0].classList = "btn btn-lg btn-block btn-danger"; // Else, turn the button red
+	  		// Else, turn the button red
+			document.getElementsByTagName("button")[0].classList = "btn btn-lg btn-block btn-danger";
 			return false;
 		});
-		console.log(result);
-	}
-
-	function read() {
-		for (var i = 0; i < keyboard.buffer.length/2; i+=2) {
-			var analog = buffer[i+1];
-			if (analog >  0) {
-				document.getElementById(buffer[i]).style.color = "rgb(" + analog + ",0,255)";
-			} else {
-				document.getElementById(buffer[i]).style.color = "#FFF";
-			}
-		}
 	}
   </script>
 </body>
